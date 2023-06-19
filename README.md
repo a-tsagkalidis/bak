@@ -1,0 +1,2 @@
+### BAK
+bak is a backup tool that creates a compressed archive of files and directories to the user's home directory. On its initial run, bak will check for all the directories, files, and registered paths that are necessary for its operation. Bak will be registered as a hashed command in the user's shell, and will be available for use after the user's next login.

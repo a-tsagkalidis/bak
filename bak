@@ -1,0 +1,254 @@
+#!/bin/bash
+
+
+# cοnfigures the $PATH variable to read the $HOME/bin path, where bak command is nested
+configure_path()
+{
+    echo "" >> $HOME/.bashrc
+    echo "# set Pat so it includes user's private bin if it exists" >> $HOME/.bashrc
+    echo 'IsInPath=$(echo $PATH | grep -c $HOME)' >> $HOME/.bashrc
+    echo 'if [ $IsInPath -eq 0 ]; then' >> $HOME/.bashrc
+    echo '  PATH="$HOME/bin:$PATH"' >> $HOME/.bashrc
+    echo 'fi' >> $HOME/.bashrc
+    sleep 2
+    echo -e ".bashrc configuration file updated to check PATH=\"\$HOME/bin:\$PATH\" validity"
+    sleep 2
+}
+
+
+# configures .bashrc file and invokes configure_path function if needed
+check_bashrc()
+{
+    if ! [ -f "$HOME/.bashrc" ]; then
+        touch $HOME/.bashrc
+        sleep 2
+        echo -e ".bashrc configuration file has been sucessfully created in directory $HOME"
+        ManIfFile=$(cat /$HOME/.bashrc | grep -c 'MANPATH="$HOME/.man:$MANPATH"')
+        if [ $ManIfFile -eq 0 ]; then
+            echo 'export MANPATH="$HOME/.man:$MANPATH"' >> $HOME/.bashrc
+        fi
+        configure_path
+    else
+        if [ $IsInFile -eq 0 ]; then
+            configure_path
+        fi
+    fi
+}
+
+
+# VARIABLES
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+ORANGE='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+DATE=$(date +%Y-%m-%d)
+HOSTNAME=$(hostname -s)
+USERNAME=$USER
+if [ -d $1 ] || [ -f $1 ] && [ ! "$1" == "" ]; then
+    LAST_DIR="$(basename $1)"
+fi
+ARCHIVE_FILE="$DATE-$USERNAME-$HOSTNAME-$LAST_DIR.tar.gz"
+BACKUP_DIR="$HOME/BACKUPS"
+DESTINATION="$BACKUP_DIR/$ARCHIVE_FILE"
+if [ ! -f $HOME/.bashrc ]; then
+    check
+fi
+IsInFile=$(cat /$HOME/.bashrc | grep -c 'PATH="$HOME/bin:$PATH"')
+ManInFile=$(cat /$HOME/.bashrc | grep -c 'MANPATH="$HOME/.man:$MANPATH"')
+
+
+# splits user's cronjob time input into minutes and hours, and check if it's in correct format; else is geting recursive
+timecheck()
+{
+    echo "plese enter time or your daily automated backup [24h format; e.g. 5:15 PM must be given as 1715]"
+    read usertime
+    if [ ! ${#usertime} -eq 4 ]; then
+        echo "time format is incorrect; input lenfth should be exactly 4 digits; [24h format; e.g. 8:30 AM will be given as 0830]"
+        timecheck
+    else
+        minutes="${usertime:2:2}"
+        hours="${usertime:0:2}"
+
+        if [ "$minutes" -gt 59 ] || [ "$hours" -gt 23 ]; then
+            echo "can't exceed 23 hours or 59 minutes; your input must be between 0000 and 2359"
+            timecheck
+        else
+            # sets cronjob time in a compatible string before importing it in crontab
+            usertime=""$minutes" "$hours" * * *"
+        fi
+    fi
+}
+
+
+# configures the bin directory and copies bak command in it
+check_bin()
+{
+    if ! [ -d "$HOME/bin" ]; then
+    mkdir -p $HOME/bin
+    echo -e "sucessfully created $HOME/bin directory"
+        if ! [ -f "$HOME/bin/bak" ]; then
+        # copies this .sh file ti $HOME/bin directory
+        cp "$0" "$HOME/bin/"
+        sleep 2
+        chmod 744 $HOME/bin/bak
+        echo -e "bak command has been sucessfully copied to $HOME/bin directory"
+        sleep 2
+        fi
+        echo -e "please reboot your terminal to use bak command"
+        exit 1
+    fi
+}
+
+
+# configures and installs the man pages for the back command
+man_pages()
+{
+    if ! [ -d "$HOME/.man" ]; then
+        mkdir -p $HOME/.man/man1
+        echo -e "successfully created directory $HOME/.man/man1"
+        if [ $ManInFile -eq 0 ]; then
+            echo 'export MANPATH="$HOME/.man:$MANPATH"' >> $HOME/.bashrc
+        fi
+        echo ".\" Manpage for bak.
+.\" Contact arg.tsag@gmail.com to correct any errors or typos.
+.TH man 1 \"06 March 2023\" \"1.0\" \"bak man page\"
+.SH NAME
+bak \- a command line tool for backing up files and directories
+.SH SYNOPSIS
+bak [OPTION]... [FILE]...
+.SH DESCRIPTION
+bak is a backup tool that creates a compressed archive of files and directories to the user's home directory. On its initial run, bak will check for all the directories, files, and registered paths that are necessary for its operation. Bak will be registered as a hashed command in the user's shell, and will be available for use after the user's next login.
+
+To use bak, it is required a mandatory option that indicated the absolute path of the desired file or directory to be backed up. For example, to backup a directory named \"Work\" that is located in $HOME directory, the user must type the following command: \"bak $HOME/Work\" or \bak ~/Work\". The user can also backup multiple files and directories by typing: \"bak $HOME/Work $HOME/Downloads\". The data will be compressed to tar.gz form, and by default it is stored into the $HOME/BACKUPS directory. The compressed file will be named based on variables \$DATE, \$USERNAME, and \$HOSTNAME.
+
+If bak will be used more than once during the same day, the previous compressed data will be automatically renamed with an additional suffix of \"-PREVIOUS_BACKUP\", and will be moved to $HOME/BACKUPS/*DATE*-PREVIOUS_BACKUP directory, leaving space for the new compressed data in the deafult $HOME/BACKUPS directory.
+.SH OPTIONS
+.TP
+.B \f[B]-c\f[R], \f[B]--crontab\f[R]
+sets bak as a cronjob for automated daily-basis run for a specific time of the day. The user will be prompted for the desired time in 24h format; e.g. 6:15 PM must be given as \"1815\". For instance, if the user want to set a cronjob that backups $HOME/Work directory on a daily basis at 1:30 PM, then he should type: \"bak -c $HOME/Work\" and then enter \"1330\" when prompted. User can always check for its saved cronjobs by running \"crontab -l\" command.
+.TP
+.B \f[B]-h\f[R], \f[B]--help\f[R]
+displays bak help message; a brief description of bak command and its options.
+.TP
+.B \f[B]-r\f[R], \f[B]--remove\f[R]
+removes automated bak from crontab. The user will be prompted for the time of the bak cronjob to be removed. For instance, if the user want to remove the bak cronjob that backups $HOME/Work directory on a daily basis at 1:30 PM, then he should type: \"bak -d $HOME/Work\" and then enter \"1330\" when prompted for the time.
+.SH SEE ALSO
+crontab(1), tar(1), gzip(1), crontab(5)
+.SH REPORTING BUGS
+No known bugs so far. Report bugs to arg.tsag@gmail.com
+.SH AUTHOR
+Argyrios Tsagkalidis (arg.tsag@gmail.com)
+.SH COPYRIGHT
+Copyrigth \(co 2023 Argyrios Tsagkalidis. License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>." >> $HOME/.man/man1/bak.1
+    sleep 2
+    echo -e "successfully registered man pages for bak command"
+    fi
+}
+
+
+# main function
+main()
+{
+    man_pages
+    check_bashrc
+    check_bin
+}
+main
+
+
+# conditional statements for bak command options -c, -h, and -r
+if [ "$1"=="h" ] || [ "$1"=="--help" ] || [ "$1"=="-c" ] || [ "$1"=="--cronjob" ] || [ "$1"=="-r" ] || [ "$1"=="--remove" ]; then
+    case $1 in
+    -h | --help)
+        echo -e "bak is a backup tool that creates a compressed archive of files and directories to the user's home directory. On its initial run, bak will check for all the directories, files, and registered paths that are necessary for its operation. Bak will be registered as a hashed command in the user's shell, and will be available for use after the user's next login. For more information check the bak man pages."
+        exit 1
+        ;;
+
+    -c | --cronjob)
+        if [ "$2" == "" ]; then
+            echo -e "please enter the absolute path of the file or directory you want to backup"
+            exit 1
+        fi
+        
+        if [ ! -d "$2" ]; then
+            echo -e "$2 is not a directory; look for help by typing \"bak -h\""
+            exit 1
+        fi
+
+        timecheck
+
+        if [ `crontab -l | egrep -cw "${minutes} ${hours} \* \* \* ${HOME}/bin/bak ${2}"` -gt 0 ]; then
+            echo -e "bak cronjob for $2 at $hours:$minutes already exists"
+            exit 1
+        fi
+
+        # imports cronjob time, bak command, and the absolute path of the file or directory to be backed up in crontab
+        crontab -l 2> /dev/null | { cat; echo "$usertime" "$HOME/bin/bak $2"; } | crontab -
+        echo -e "cronjob set; $2 will be backuped up in $HOME/BACKUPS directory every day at $hours:$minutes"
+        exit 1
+        ;;
+
+    -r | --remove)
+        if [ "$2" == "" ]; then
+            echo -e "please enter the absolute path of the file or directory you want to remove from crontab; look for help by typing \"bak -h\""
+            exit 1
+        fi
+
+        if [ ! -d $2 ]; then
+            echo -e "$2 is not a directory; look for help by typing \"bak -h\""
+            exit 1
+        fi
+
+        timecheck
+
+        if [ `crontab -l | egrep -cw "${minutes} ${hours} \* \* \* ${HOME}/bin/bak ${2}"` -gt 0 ]; then
+            crontab -l | egrep -v --word-regexp "${minutes} ${hours} \* \* \* ${HOME}/bin/bak ${2}" | crontab -
+            echo -e "cronjob for $2 at $hours:$minutes has been removed"
+        else
+            echo -e "cronjob for $2 at $hours:$minutes does not exist"
+        fi
+        exit 1
+
+    esac
+fi
+
+
+# check if the destination has been given
+if [ -z "$1" ]; then
+    echo -e "please enter the absolute path of the file or directory you want to backup; look for help by typing \"bak -h\""
+    exit 1
+fi
+
+# checks for destination validity
+if [ ! -d "$1" ] && [ ! -f "$1" ]; then
+    echo -e "$1 is not a directory or file; look for help by typing \"bak -h\""
+    exit 1
+fi
+
+# configures the backup directory
+if ! [ -d "$BACKUP_DIR" ]; then
+    mkdir -p $BACKUP_DIR
+    echo -e "successfully created $BACKUP_DIR directory"
+fi
+
+# backup with tar command; moves the previous backup to a new directory and renames it with a suffix of "-PREVIOUS_BACKUP"
+if ! [ -f "$DESTINATION" ]; then
+    tar -czf $DESTINATION $1
+    sleep 2
+    echo -e "$ARCHIVE_FILE has been successfully created in $BACKUP_DIR directory"
+else
+    if ! [ -d "$BACKUP_DIR/$DATE-PREVIOUS_BACKUP" ]; then
+        mkdir -p $BACKUP_DIR/$DATE-PREVIOUS_BACKUP
+        echo -e "successfully created $BACKUP_DIR/$DATE-PREVIOUS_BACKUP directory"
+    fi
+    mv $DESTINATION $BACKUP_DIR/$DATE-PREVIOUS_BACKUP
+    mv $DESTINATION-PREVIOUS $BACKUP_DIR/$DATE-$LAST_DIR-PREVIOUS_BACKUP
+    sleep 2
+    echo -e "your last backup has been renamed to $DATE-$LAST_DIR-PREVIOUS"
+    sleep 2
+    echo -e "$ARCHIVE_FILE-PREVIOUS has been moved to BACKUPS/$DATE-$LAST_DIR-PREVIOUS_BACKUP directory"
+    sleep 2
+    tar -czf $DESTINATION $1
+    echo -e "$ARCHIVE_FILE has been successfully created in $BACKUP_DIR directory"
+fi
