@@ -1,0 +1,24 @@
+# Ignore compiled or generated files
+*.out
+*.log
+
+# Ignore backup files
+*~
+
+# Ignore temporary files
+*.swp
+
+# Ignore user-specific settings
+.bash_history
+
+# Ignore any generated data files
+data/
+
+# Ignore log files
+logs/
+
+# Ignore user-specific IDE settings
+.idea/
+
+# Custom
+.vscode/
